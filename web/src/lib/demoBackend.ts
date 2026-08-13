@@ -13,16 +13,25 @@ import type { AuthResponse, Transaction, Trip, User, Wallet } from "@/lib/api";
 const STORE_KEY = "esb.demo.store";
 
 type StoredUser = User & {
-  password: string;
+  pin: string;
   transactions: Transaction[];
   trips: Trip[];
+};
+
+type PendingVerification = {
+  phone: string;
+  purpose: string;
+  code: string;
 };
 
 type Store = {
   users: StoredUser[];
   nextId: number;
-  resetTokens: Record<string, string>;
+  verifications: Record<string, PendingVerification>;
 };
+
+const DEMO_OTP_TTL = 600;
+const DEMO_RESEND_SECONDS = 30;
 
 const WELCOME_CREDIT = 2000;
 
@@ -62,11 +71,12 @@ export class DemoApiError extends Error {
 
 function readStore(): Store {
   const raw = window.localStorage.getItem(STORE_KEY);
-  if (!raw) return { users: [], nextId: 1, resetTokens: {} };
+  const empty: Store = { users: [], nextId: 1, verifications: {} };
+  if (!raw) return empty;
   try {
-    return JSON.parse(raw) as Store;
+    return { ...empty, ...(JSON.parse(raw) as Store) };
   } catch {
-    return { users: [], nextId: 1, resetTokens: {} };
+    return empty;
   }
 }
 
@@ -78,9 +88,24 @@ function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+function normalizePhone(raw: string): string {
+  const digits = String(raw).replace(/\D/g, "");
+  const local = digits.startsWith("234")
+    ? digits.slice(3)
+    : digits.replace(/^0/, "");
+  if (local.length !== 10) {
+    throw new DemoApiError("Enter a valid Nigerian phone number.", 422);
+  }
+  return `+234${local}`;
+}
+
+function maskPhone(phone: string): string {
+  return `${phone.slice(0, 7)} *** ${phone.slice(-4)}`;
+}
+
 function toUser(stored: StoredUser): User {
-  const { password, transactions, trips, ...user } = stored;
-  void password;
+  const { pin, transactions, trips, ...user } = stored;
+  void pin;
   void transactions;
   void trips;
   return user;
@@ -90,7 +115,7 @@ function authResponse(stored: StoredUser): AuthResponse {
   return {
     user: toUser(stored),
     token: {
-      access_token: `demo.${stored.email}`,
+      access_token: `demo.${stored.phone}`,
       token_type: "bearer",
       expires_in: 604800,
     },
@@ -98,9 +123,9 @@ function authResponse(stored: StoredUser): AuthResponse {
 }
 
 function requireUser(store: Store, token?: string | null): StoredUser {
-  const email = token?.startsWith("demo.") ? token.slice(5) : null;
-  const user = email
-    ? store.users.find((candidate) => candidate.email === email)
+  const phone = token?.startsWith("demo.") ? token.slice(5) : null;
+  const user = phone
+    ? store.users.find((candidate) => candidate.phone === phone)
     : undefined;
   if (!user) throw new DemoApiError("Not authenticated", 401);
   return user;
@@ -165,17 +190,81 @@ export function handleDemoRequest(
 ): unknown {
   const store = readStore();
 
-  if (path === "/auth/signup" && method === "POST") {
-    const email = String(body?.email ?? "").toLowerCase();
-    if (store.users.some((user) => user.email === email)) {
-      throw new DemoApiError("An account with this email already exists.", 409);
+  if (path === "/auth/otp/request" && method === "POST") {
+    const phone = normalizePhone(String(body?.phone ?? ""));
+    const purpose = String(body?.purpose ?? "signup");
+    const existing = store.users.find((user) => user.phone === phone);
+    if (purpose === "signup" && existing) {
+      throw new DemoApiError(
+        "This phone number is already registered. Log in instead.",
+        409,
+      );
+    }
+    if (purpose === "reset_pin" && !existing) {
+      throw new DemoApiError(
+        "We couldn't find an account for that number.",
+        404,
+      );
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationToken = `demo-otp-${Math.random().toString(36).slice(2, 10)}`;
+    store.verifications[verificationToken] = { phone, purpose, code };
+    writeStore(store);
+    return {
+      message: `Verification code sent to ${maskPhone(phone)}.`,
+      phone,
+      masked_phone: maskPhone(phone),
+      expires_in: DEMO_OTP_TTL,
+      resend_in: DEMO_RESEND_SECONDS,
+      delivered: false,
+      debug_code: code,
+    };
+  }
+
+  if (path === "/auth/otp/verify" && method === "POST") {
+    const phone = normalizePhone(String(body?.phone ?? ""));
+    const purpose = String(body?.purpose ?? "signup");
+    const code = String(body?.code ?? "");
+    const entry = Object.entries(store.verifications).find(
+      ([, item]) =>
+        item.phone === phone && item.purpose === purpose && item.code === code,
+    );
+    if (!entry) {
+      throw new DemoApiError("That code is incorrect. Please try again.", 400);
+    }
+    return {
+      verification_token: entry[0],
+      expires_in: 900,
+      purpose,
+    };
+  }
+
+  if (path === "/auth/pin" && method === "POST") {
+    const verificationToken = String(body?.verification_token ?? "");
+    const verification = store.verifications[verificationToken];
+    const pin = String(body?.pin ?? "");
+    if (!verification || !/^\d{4}$/.test(pin)) {
+      throw new DemoApiError(
+        "Your verification has expired. Please start again.",
+        400,
+      );
+    }
+    delete store.verifications[verificationToken];
+    const existing = store.users.find(
+      (candidate) => candidate.phone === verification.phone,
+    );
+    if (existing) {
+      existing.pin = pin;
+      writeStore(store);
+      return authResponse(existing);
     }
     const user: StoredUser = {
       id: store.nextId++,
-      full_name: String(body?.full_name ?? "").trim(),
-      email,
-      phone: (body?.phone as string | undefined) ?? null,
-      password: String(body?.password ?? ""),
+      full_name: String(body?.full_name ?? "").trim() || "ESB rider",
+      phone: verification.phone,
+      email: null,
+      phone_verified_at: new Date().toISOString(),
+      pin,
       wallet_balance: "0.00",
       created_at: new Date().toISOString(),
       transactions: [],
@@ -188,10 +277,10 @@ export function handleDemoRequest(
   }
 
   if (path === "/auth/login" && method === "POST") {
-    const email = String(body?.email ?? "").toLowerCase();
-    const user = store.users.find((candidate) => candidate.email === email);
-    if (!user || user.password !== String(body?.password ?? "")) {
-      throw new DemoApiError("Incorrect email or password.", 401);
+    const phone = normalizePhone(String(body?.phone ?? ""));
+    const user = store.users.find((candidate) => candidate.phone === phone);
+    if (!user || user.pin !== String(body?.pin ?? "")) {
+      throw new DemoApiError("Incorrect phone number or PIN.", 401);
     }
     return authResponse(user);
   }
@@ -200,30 +289,24 @@ export function handleDemoRequest(
     return toUser(requireUser(store, token));
   }
 
-  if (path === "/auth/forgot-password" && method === "POST") {
-    const email = String(body?.email ?? "").toLowerCase();
-    const message =
-      "If an account exists for that email, a reset link is on its way.";
-    if (!store.users.some((user) => user.email === email)) {
-      return { message, reset_token: null };
+  if (path === "/auth/me" && method === "PATCH") {
+    const user = requireUser(store, token);
+    if (body?.full_name) user.full_name = String(body.full_name).trim();
+    if (body?.email !== undefined) {
+      user.email = body.email ? String(body.email).toLowerCase() : null;
     }
-    const resetToken = `demo-reset-${Math.random().toString(36).slice(2, 10)}`;
-    store.resetTokens[resetToken] = email;
     writeStore(store);
-    return { message, reset_token: resetToken };
+    return toUser(user);
   }
 
-  if (path === "/auth/reset-password" && method === "POST") {
-    const resetToken = String(body?.token ?? "");
-    const email = store.resetTokens[resetToken];
-    const user = store.users.find((candidate) => candidate.email === email);
-    if (!user) {
-      throw new DemoApiError("This reset link is invalid or has expired.", 400);
+  if (path === "/auth/pin/change" && method === "POST") {
+    const user = requireUser(store, token);
+    if (user.pin !== String(body?.current_pin ?? "")) {
+      throw new DemoApiError("Your current PIN is incorrect.", 400);
     }
-    user.password = String(body?.password ?? "");
-    delete store.resetTokens[resetToken];
+    user.pin = String(body?.new_pin ?? "");
     writeStore(store);
-    return { message: "Your password has been updated. You can log in now." };
+    return { message: "Your PIN has been updated." };
   }
 
   if (path === "/account/wallet" && method === "GET") {

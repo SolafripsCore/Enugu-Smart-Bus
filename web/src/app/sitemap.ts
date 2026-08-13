@@ -16,7 +16,7 @@ const routes = [
   "/download",
   "/login",
   "/signup",
-  "/forgot-password",
+  "/forgot-pin",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

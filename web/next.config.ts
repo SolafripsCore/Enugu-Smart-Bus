@@ -17,11 +17,13 @@ const legacyRedirects: { source: string; destination: string }[] = [
   },
   { source: "/login/login.html", destination: "/login" },
   { source: "/signup/signup.html", destination: "/signup" },
-  { source: "/forget-password", destination: "/forgot-password" },
+  { source: "/forget-password", destination: "/forgot-pin" },
   {
     source: "/forget-password/forget-password.html",
-    destination: "/forgot-password",
+    destination: "/forgot-pin",
   },
+  { source: "/forgot-password", destination: "/forgot-pin" },
+  { source: "/reset-password", destination: "/forgot-pin" },
 ];
 
 // Static export (`STATIC_EXPORT=1 npm run build`) is used for preview hosting on

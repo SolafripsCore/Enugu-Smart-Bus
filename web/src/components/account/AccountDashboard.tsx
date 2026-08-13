@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { ProfileSettings } from "@/components/account/ProfileSettings";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Bus, CreditCard } from "@/components/ui/Icons";
@@ -93,7 +94,10 @@ export function AccountDashboard() {
           <h1 className="heading-lg mt-2 text-navy-900">
             Hello, {user.full_name.split(" ")[0]}
           </h1>
-          <p className="mt-2 text-navy-900/60">{user.email}</p>
+          <p className="mt-2 text-navy-900/60">
+            {user.phone}
+            {user.email ? ` · ${user.email}` : ""}
+          </p>
         </div>
         <Button
           variant="ghost"
@@ -238,6 +242,8 @@ export function AccountDashboard() {
           )}
         </ul>
       </div>
+
+      <ProfileSettings />
     </div>
   );
 }

@@ -8,10 +8,29 @@ export const TOKEN_STORAGE_KEY = "esb.token";
 export type User = {
   id: number;
   full_name: string;
-  email: string;
-  phone: string | null;
+  phone: string;
+  email: string | null;
+  phone_verified_at: string | null;
   wallet_balance: string;
   created_at: string;
+};
+
+export type OtpPurpose = "signup" | "reset_pin";
+
+export type OtpResponse = {
+  message: string;
+  phone: string;
+  masked_phone: string;
+  expires_in: number;
+  resend_in: number;
+  delivered: boolean;
+  debug_code: string | null;
+};
+
+export type OtpVerifyResponse = {
+  verification_token: string;
+  expires_in: number;
+  purpose: OtpPurpose;
 };
 
 export type AuthResponse = {

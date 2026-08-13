@@ -17,19 +17,19 @@ import {
   type User,
 } from "@/lib/api";
 
-type SignupInput = {
-  full_name: string;
-  email: string;
-  phone?: string;
-  password: string;
+type SetPinInput = {
+  verification_token: string;
+  pin: string;
+  full_name?: string;
 };
 
 type AuthContextValue = {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  signup: (input: SignupInput) => Promise<User>;
+  login: (phone: string, pin: string) => Promise<User>;
+  completePin: (input: SetPinInput) => Promise<User>;
+  setUser: (user: User) => void;
   logout: () => void;
   refresh: () => Promise<void>;
 };
@@ -74,20 +74,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       token,
       loading,
-      login: async (email, password) =>
+      login: async (phone, pin) =>
         applySession(
           await apiFetch<AuthResponse>("/auth/login", {
             method: "POST",
-            body: { email, password },
+            body: { phone, pin },
           }),
         ),
-      signup: async (input) =>
+      completePin: async (input) =>
         applySession(
-          await apiFetch<AuthResponse>("/auth/signup", {
+          await apiFetch<AuthResponse>("/auth/pin", {
             method: "POST",
             body: input,
           }),
         ),
+      setUser,
       logout: () => {
         window.localStorage.removeItem(TOKEN_STORAGE_KEY);
         setToken(null);

@@ -7,6 +7,7 @@ from sqlmodel.pool import StaticPool
 
 from app.database import get_session
 from app.main import app
+from app.phone import InvalidPhoneNumber, normalize_phone
 
 
 @pytest.fixture(name="client")
@@ -28,38 +29,69 @@ def client_fixture() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
 
 
-SIGNUP = {
-    "full_name": "Ada Okonkwo",
-    "email": "ada@example.com",
-    "phone": "+2348000000000",
-    "password": "SuperSecret1",
-}
+PHONE = "0803 000 0000"
+E164 = "+2348030000000"
+PIN = "1357"
+
+
+def request_code(
+    client: TestClient, phone: str = PHONE, purpose: str = "signup"
+) -> str:
+    response = client.post(
+        "/auth/otp/request", json={"phone": phone, "purpose": purpose}
+    )
+    assert response.status_code == 200, response.text
+    code = response.json()["debug_code"]
+    assert code
+    return code
+
+
+def verify_code(
+    client: TestClient, code: str, phone: str = PHONE, purpose: str = "signup"
+) -> str:
+    response = client.post(
+        "/auth/otp/verify", json={"phone": phone, "code": code, "purpose": purpose}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["verification_token"]
+
+
+def register(client: TestClient, full_name: str = "Ada Okonkwo") -> str:
+    token = verify_code(client, request_code(client))
+    created = client.post(
+        "/auth/pin",
+        json={"verification_token": token, "pin": PIN, "full_name": full_name},
+    )
+    assert created.status_code == 201, created.text
+    return created.json()["token"]["access_token"]
+
+
+def test_normalize_phone() -> None:
+    for raw in ("08030000000", "8030000000", "2348030000000", "+234 803 000 0000"):
+        assert normalize_phone(raw) == E164
+    for raw in ("", "0123", "0603000000000"):
+        with pytest.raises(InvalidPhoneNumber):
+            normalize_phone(raw)
 
 
 def test_signup_login_and_wallet(client: TestClient) -> None:
-    created = client.post("/auth/signup", json=SIGNUP)
-    assert created.status_code == 201
-    token = created.json()["token"]["access_token"]
+    access_token = register(client)
+    headers = {"Authorization": f"Bearer {access_token}"}
 
-    duplicate = client.post("/auth/signup", json=SIGNUP)
-    assert duplicate.status_code == 409
+    me = client.get("/auth/me", headers=headers)
+    assert me.json()["phone"] == E164
+    assert me.json()["full_name"] == "Ada Okonkwo"
 
-    bad_login = client.post(
-        "/auth/login", json={"email": SIGNUP["email"], "password": "wrong-password"}
-    )
+    taken = client.post("/auth/otp/request", json={"phone": PHONE})
+    assert taken.status_code == 409
+
+    bad_login = client.post("/auth/login", json={"phone": PHONE, "pin": "9999"})
     assert bad_login.status_code == 401
 
-    login = client.post(
-        "/auth/login", json={"email": SIGNUP["email"], "password": SIGNUP["password"]}
-    )
+    login = client.post("/auth/login", json={"phone": "08030000000", "pin": PIN})
     assert login.status_code == 200
 
-    headers = {"Authorization": f"Bearer {token}"}
-    me = client.get("/auth/me", headers=headers)
-    assert me.json()["email"] == SIGNUP["email"]
-
     wallet = client.get("/account/wallet", headers=headers)
-    assert wallet.status_code == 200
     assert float(wallet.json()["balance"]) == pytest.approx(1100.0)
     assert len(wallet.json()["transactions"]) == 4
 
@@ -68,8 +100,85 @@ def test_signup_login_and_wallet(client: TestClient) -> None:
     )
     assert float(topped_up.json()["balance"]) == pytest.approx(2000.0)
 
-    trips = client.get("/account/trips", headers=headers)
-    assert len(trips.json()) == 3
+    assert len(client.get("/account/trips", headers=headers).json()) == 3
+
+
+def test_otp_rejects_wrong_code(client: TestClient) -> None:
+    code = request_code(client)
+    wrong = "0" * len(code) if code != "0" * len(code) else "1" * len(code)
+    rejected = client.post(
+        "/auth/otp/verify", json={"phone": PHONE, "code": wrong, "purpose": "signup"}
+    )
+    assert rejected.status_code == 400
+
+    assert verify_code(client, code)
+
+    replayed = client.post(
+        "/auth/otp/verify", json={"phone": PHONE, "code": code, "purpose": "signup"}
+    )
+    assert replayed.status_code == 400
+
+
+def test_pin_requires_valid_verification(client: TestClient) -> None:
+    rejected = client.post(
+        "/auth/pin",
+        json={"verification_token": "nonsense", "pin": PIN, "full_name": "Ada O"},
+    )
+    assert rejected.status_code == 400
+
+    short_pin = client.post(
+        "/auth/pin",
+        json={"verification_token": "nonsense", "pin": "12", "full_name": "Ada O"},
+    )
+    assert short_pin.status_code == 422
+
+
+def test_reset_pin_flow(client: TestClient) -> None:
+    register(client)
+
+    unknown = client.post(
+        "/auth/otp/request", json={"phone": "08039999999", "purpose": "reset_pin"}
+    )
+    assert unknown.status_code == 404
+
+    token = verify_code(
+        client, request_code(client, purpose="reset_pin"), purpose="reset_pin"
+    )
+    updated = client.post(
+        "/auth/pin", json={"verification_token": token, "pin": "2468"}
+    )
+    assert updated.status_code == 201
+
+    assert (
+        client.post("/auth/login", json={"phone": PHONE, "pin": PIN}).status_code == 401
+    )
+    assert (
+        client.post("/auth/login", json={"phone": PHONE, "pin": "2468"}).status_code
+        == 200
+    )
+
+
+def test_profile_update_and_pin_change(client: TestClient) -> None:
+    headers = {"Authorization": f"Bearer {register(client)}"}
+
+    updated = client.patch(
+        "/auth/me",
+        json={"full_name": "Ada N. Okonkwo", "email": "ada@example.com"},
+        headers=headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["email"] == "ada@example.com"
+
+    changed = client.post(
+        "/auth/pin/change",
+        json={"current_pin": PIN, "new_pin": "8642"},
+        headers=headers,
+    )
+    assert changed.status_code == 200
+    assert (
+        client.post("/auth/login", json={"phone": PHONE, "pin": "8642"}).status_code
+        == 200
+    )
 
 
 def test_wallet_requires_authentication(client: TestClient) -> None:
@@ -77,33 +186,6 @@ def test_wallet_requires_authentication(client: TestClient) -> None:
     assert (
         client.get("/account/wallet", headers={"Authorization": "Bearer nope"})
     ).status_code == 401
-
-
-def test_password_reset_flow(client: TestClient) -> None:
-    client.post("/auth/signup", json=SIGNUP)
-
-    unknown = client.post("/auth/forgot-password", json={"email": "nobody@example.com"})
-    assert unknown.status_code == 200
-    assert unknown.json()["reset_token"] is None
-
-    requested = client.post("/auth/forgot-password", json={"email": SIGNUP["email"]})
-    reset_token = requested.json()["reset_token"]
-    assert reset_token
-
-    reset = client.post(
-        "/auth/reset-password", json={"token": reset_token, "password": "BrandNewPass9"}
-    )
-    assert reset.status_code == 200
-
-    replayed = client.post(
-        "/auth/reset-password", json={"token": reset_token, "password": "AnotherPass9"}
-    )
-    assert replayed.status_code == 400
-
-    login = client.post(
-        "/auth/login", json={"email": SIGNUP["email"], "password": "BrandNewPass9"}
-    )
-    assert login.status_code == 200
 
 
 def test_contact_and_newsletter(client: TestClient) -> None:

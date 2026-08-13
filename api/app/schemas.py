@@ -3,19 +3,62 @@ from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models import TransactionKind
+from app.config import get_settings
+from app.models import TransactionKind, VerificationPurpose
+
+settings = get_settings()
+
+PIN_PATTERN = rf"^\d{{{settings.pin_length}}}$"
+OTP_PATTERN = rf"^\d{{{settings.otp_length}}}$"
 
 
-class SignupRequest(BaseModel):
-    full_name: str = Field(min_length=2, max_length=120)
-    email: EmailStr
-    phone: str | None = Field(default=None, max_length=32)
-    password: str = Field(min_length=8, max_length=128)
+class OtpRequest(BaseModel):
+    phone: str = Field(min_length=6, max_length=24)
+    purpose: VerificationPurpose = VerificationPurpose.signup
+
+
+class OtpResponse(BaseModel):
+    message: str
+    phone: str
+    masked_phone: str
+    expires_in: int
+    resend_in: int
+    delivered: bool
+    # Only populated when no SMS provider is configured.
+    debug_code: str | None = None
+
+
+class OtpVerifyRequest(BaseModel):
+    phone: str = Field(min_length=6, max_length=24)
+    code: str = Field(pattern=OTP_PATTERN)
+    purpose: VerificationPurpose = VerificationPurpose.signup
+
+
+class OtpVerifyResponse(BaseModel):
+    verification_token: str
+    expires_in: int
+    purpose: VerificationPurpose
+
+
+class SetPinRequest(BaseModel):
+    verification_token: str
+    pin: str = Field(pattern=PIN_PATTERN)
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+    phone: str = Field(min_length=6, max_length=24)
+    pin: str = Field(pattern=PIN_PATTERN)
+
+
+class ChangePinRequest(BaseModel):
+    current_pin: str = Field(pattern=PIN_PATTERN)
+    new_pin: str = Field(pattern=PIN_PATTERN)
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
 
 
 class TokenResponse(BaseModel):
@@ -27,8 +70,9 @@ class TokenResponse(BaseModel):
 class UserResponse(BaseModel):
     id: int
     full_name: str
-    email: EmailStr
-    phone: str | None
+    phone: str
+    email: EmailStr | None = None
+    phone_verified_at: datetime | None = None
     wallet_balance: Decimal
     created_at: datetime
 
@@ -36,20 +80,6 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     token: TokenResponse
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-
-class ForgotPasswordResponse(BaseModel):
-    message: str
-    reset_token: str | None = None
-
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    password: str = Field(min_length=8, max_length=128)
 
 
 class MessageResponse(BaseModel):

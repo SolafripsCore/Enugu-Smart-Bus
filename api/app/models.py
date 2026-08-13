@@ -12,9 +12,12 @@ def utcnow() -> datetime:
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     full_name: str
-    email: str = Field(index=True, unique=True)
-    phone: str | None = None
-    hashed_password: str
+    phone: str = Field(index=True, unique=True)
+    email: str | None = Field(default=None, index=True)
+    hashed_pin: str
+    phone_verified_at: datetime | None = None
+    failed_pin_attempts: int = 0
+    locked_until: datetime | None = None
     wallet_balance: Decimal = Field(
         default=Decimal("0"), max_digits=12, decimal_places=2
     )
@@ -22,12 +25,19 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
-class PasswordResetToken(SQLModel, table=True):
+class VerificationPurpose(str, Enum):
+    signup = "signup"
+    reset_pin = "reset_pin"
+
+
+class PhoneVerification(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    token: str = Field(index=True, unique=True)
+    phone: str = Field(index=True)
+    purpose: VerificationPurpose
+    hashed_code: str
     expires_at: datetime
-    used_at: datetime | None = None
+    attempts: int = 0
+    consumed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

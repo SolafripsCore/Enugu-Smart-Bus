@@ -11,15 +11,32 @@ class Settings(BaseSettings):
     jwt_secret: str = "insecure-development-secret-change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 60 * 24 * 7
-    reset_token_minutes: int = 30
     cors_origins: str = "*"
     site_url: str = "https://enugu-smart-bus-psi.vercel.app"
     resend_api_key: str = ""
     mail_from: str = "Enugu Smart Bus <onboarding@resend.dev>"
     contact_email: str = "support@enugusmartbus.com"
-    # Without a transactional email provider the reset token is returned by the
-    # API so the flow can still be completed from the web app.
-    expose_reset_token: bool = True
+
+    # Phone verification
+    default_country_code: str = "234"
+    otp_length: int = 6
+    otp_minutes: int = 10
+    otp_resend_seconds: int = 60
+    otp_max_attempts: int = 5
+    verification_token_minutes: int = 15
+    pin_length: int = 4
+    pin_max_attempts: int = 5
+    pin_lockout_minutes: int = 15
+    # Without an SMS provider the OTP is returned by the API so the flow can
+    # still be completed end to end (development and pre-launch previews).
+    expose_otp: bool = True
+
+    # SMS providers (first configured one wins)
+    termii_api_key: str = ""
+    termii_sender_id: str = "ESBus"
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
 
 
 @lru_cache

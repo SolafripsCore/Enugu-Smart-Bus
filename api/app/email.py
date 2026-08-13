@@ -46,19 +46,6 @@ def send_email(to: str, subject: str, html: str, reply_to: str | None = None) ->
     return True
 
 
-def send_password_reset(to: str, full_name: str, token: str) -> bool:
-    link = f"{settings.site_url.rstrip('/')}/reset-password?token={token}"
-    html = f"""
-    <p>Hello {full_name},</p>
-    <p>We received a request to reset your Enugu Smart Bus password.
-    Use the link below within {settings.reset_token_minutes} minutes:</p>
-    <p><a href="{link}">Reset your password</a></p>
-    <p>If you didn't request this, you can safely ignore this email.</p>
-    <p>— Enugu Smart Bus</p>
-    """
-    return send_email(to, "Reset your Enugu Smart Bus password", html)
-
-
 def send_contact_notification(
     name: str, email: str, phone: str | None, subject: str, message: str
 ) -> bool:

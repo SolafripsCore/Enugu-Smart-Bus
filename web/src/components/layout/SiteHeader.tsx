@@ -80,20 +80,12 @@ export function SiteHeader() {
             aria-label={`${site.name} home`}
           >
             <Image
-              src="/images/brand/logo-mark.webp"
-              alt=""
-              width={512}
-              height={476}
-              priority
-              className="h-14 w-auto sm:hidden"
-            />
-            <Image
               src="/images/brand/logo-full.webp"
               alt={site.name}
               width={960}
               height={406}
               priority
-              className="hidden h-20 w-auto sm:block"
+              className="h-12 w-auto sm:h-20"
             />
           </Link>
 

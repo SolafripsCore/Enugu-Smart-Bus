@@ -85,14 +85,16 @@ export function SiteHeader() {
               width={512}
               height={476}
               priority
-              className="h-12 w-auto"
+              className="h-12 w-auto sm:hidden"
             />
-            <span className="hidden font-display text-lg font-bold leading-none text-navy-700 sm:block">
-              Enugu
-              <span className="mt-1 block text-[15px] font-bold leading-none text-grass-600">
-                Smart Bus
-              </span>
-            </span>
+            <Image
+              src="/images/brand/logo-full.webp"
+              alt={site.name}
+              width={960}
+              height={406}
+              priority
+              className="hidden h-12 w-auto sm:block"
+            />
           </Link>
 
           <nav aria-label="Main" className="hidden lg:block">

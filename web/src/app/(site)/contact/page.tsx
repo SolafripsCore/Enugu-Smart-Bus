@@ -69,7 +69,7 @@ export default function ContactPage() {
                       {"href" in line && line.href ? (
                         <a
                           href={line.href}
-                          className="transition hover:text-grass-700"
+                          className="inline-flex min-h-11 items-center transition hover:text-grass-700"
                         >
                           {line.label}
                         </a>

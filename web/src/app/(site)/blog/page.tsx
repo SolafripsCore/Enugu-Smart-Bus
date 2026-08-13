@@ -60,7 +60,7 @@ export default function BlogPage() {
               </p>
               <Link
                 href={`/blog/${featured.slug}`}
-                className="mt-6 inline-flex items-center gap-2 font-semibold text-navy-700 transition hover:text-grass-600"
+                className="mt-6 inline-flex min-h-11 items-center gap-2 font-semibold text-navy-700 transition hover:text-grass-600"
               >
                 Read the story
                 <ArrowRight className="h-4 w-4" />

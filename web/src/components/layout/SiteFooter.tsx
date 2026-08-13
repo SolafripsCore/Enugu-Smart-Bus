@@ -45,12 +45,12 @@ export function SiteFooter() {
             <h3 className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-grass-300">
               Quick links
             </h3>
-            <ul className="mt-5 space-y-2.5 text-sm text-white/70">
+            <ul className="mt-5 space-y-1 text-sm text-white/70">
               {footerLinks.map((link) => (
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="transition hover:text-white"
+                    className="inline-flex min-h-10 items-center py-1 transition hover:text-white"
                   >
                     {link.label}
                   </Link>
@@ -71,7 +71,7 @@ export function SiteFooter() {
               <li className="flex gap-3">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0 text-grass-300" />
                 <a
-                  className="transition hover:text-white"
+                  className="inline-flex min-h-10 items-center transition hover:text-white"
                   href={site.phoneHref}
                 >
                   {site.phone}
@@ -81,13 +81,13 @@ export function SiteFooter() {
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-grass-300" />
                 <span className="flex flex-col">
                   <a
-                    className="transition hover:text-white"
+                    className="inline-flex min-h-10 items-center transition hover:text-white"
                     href={`mailto:${site.emails.info}`}
                   >
                     {site.emails.info}
                   </a>
                   <a
-                    className="transition hover:text-white"
+                    className="inline-flex min-h-10 items-center transition hover:text-white"
                     href={`mailto:${site.emails.support}`}
                   >
                     {site.emails.support}
@@ -115,7 +115,7 @@ export function SiteFooter() {
                     href={social.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-3 transition hover:text-white"
+                    className="inline-flex min-h-11 items-center gap-3 transition hover:text-white"
                   >
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
                       <Image

@@ -142,7 +142,7 @@ export function LoginForm() {
         <div className="flex justify-end">
           <Link
             href="/forgot-password"
-            className="text-sm font-medium text-grass-700 hover:underline"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-grass-700 hover:underline"
           >
             Forgot password?
           </Link>
@@ -158,7 +158,7 @@ export function LoginForm() {
         Don&apos;t have an account?{" "}
         <Link
           href="/signup"
-          className="font-semibold text-navy-700 hover:underline"
+          className="inline-flex min-h-11 items-center font-semibold text-navy-700 hover:underline"
         >
           Sign up
         </Link>
@@ -296,7 +296,7 @@ export function SignupForm() {
         Already have an account?{" "}
         <Link
           href="/login"
-          className="font-semibold text-navy-700 hover:underline"
+          className="inline-flex min-h-11 items-center font-semibold text-navy-700 hover:underline"
         >
           Log in
         </Link>
@@ -376,7 +376,7 @@ export function ForgotPasswordForm() {
         Remembered it?{" "}
         <Link
           href="/login"
-          className="font-semibold text-navy-700 hover:underline"
+          className="inline-flex min-h-11 items-center font-semibold text-navy-700 hover:underline"
         >
           Back to log in
         </Link>

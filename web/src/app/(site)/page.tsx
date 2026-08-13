@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { AppCta } from "@/components/AppCta";
+import { LaunchStatusCard } from "@/components/LaunchStatusCard";
 import { Testimonials } from "@/components/Testimonials";
 import { ButtonLink } from "@/components/ui/Button";
 import {
@@ -75,6 +76,7 @@ export default function HomePage() {
                 See how it works
               </ButtonLink>
             </div>
+            <LaunchStatusCard className="mt-10 max-w-md lg:hidden" />
             <dl className="mt-12 grid max-w-xl grid-cols-2 gap-6 border-t border-white/10 pt-8 sm:grid-cols-4">
               {stats.map((stat) => (
                 <div key={stat.label}>
@@ -102,19 +104,7 @@ export default function HomePage() {
               priority
               className="relative w-full rounded-3xl border border-white/15 object-cover shadow-lift"
             />
-            <div className="absolute -bottom-8 left-6 flex items-center gap-3 rounded-2xl bg-white p-4 shadow-lift">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-grass-50 text-grass-600">
-                <Bus className="h-6 w-6" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-navy-800">
-                  Next bus in 4 min
-                </span>
-                <span className="block text-xs text-navy-900/60">
-                  Route 3 · Ogbete → Independence Layout
-                </span>
-              </span>
-            </div>
+            <LaunchStatusCard className="relative z-10 -mt-12 ml-6 mr-12" />
           </div>
         </div>
       </section>

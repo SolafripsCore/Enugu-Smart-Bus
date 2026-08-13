@@ -195,7 +195,7 @@ export function ContactForm() {
           onChange={(event) =>
             setFields({ ...fields, consent: event.target.checked })
           }
-          className="mt-0.5 h-4 w-4 rounded border-navy-200 text-grass-500 focus:ring-grass-400"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded border-navy-200 text-grass-500 focus:ring-grass-400"
         />
         I agree to the privacy policy and consent to being contacted about this
         enquiry.

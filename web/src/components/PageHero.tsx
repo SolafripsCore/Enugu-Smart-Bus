@@ -38,7 +38,10 @@ export function PageHero({
                 {breadcrumb.map((crumb, index) => (
                   <li key={crumb.label} className="flex items-center gap-2">
                     {crumb.href ? (
-                      <Link href={crumb.href} className="hover:text-white">
+                      <Link
+                        href={crumb.href}
+                        className="inline-flex min-h-9 items-center hover:text-white"
+                      >
                         {crumb.label}
                       </Link>
                     ) : (

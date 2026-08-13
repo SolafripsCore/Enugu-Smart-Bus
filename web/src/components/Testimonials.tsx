@@ -46,20 +46,24 @@ export function Testimonials() {
               onClick={() => setActive(index)}
               aria-label={`Show testimonial from ${testimonial.name}`}
               aria-current={index === active}
-              className={[
-                "h-2 rounded-full transition-all",
-                index === active
-                  ? "w-8 bg-grass-500"
-                  : "w-2 bg-navy-200 hover:bg-navy-300",
-              ].join(" ")}
-            />
+              className="group flex h-11 items-center px-1"
+            >
+              <span
+                className={[
+                  "block h-2 rounded-full transition-all",
+                  index === active
+                    ? "w-8 bg-grass-500"
+                    : "w-2 bg-navy-200 group-hover:bg-navy-300",
+                ].join(" ")}
+              />
+            </button>
           ))}
           <button
             type="button"
             onClick={() =>
               setActive((value) => (value + 1) % testimonials.length)
             }
-            className="ml-auto inline-flex items-center gap-2 text-sm font-semibold text-navy-700 transition hover:text-grass-600"
+            className="ml-auto inline-flex min-h-11 items-center gap-2 py-2 text-sm font-semibold text-navy-700 transition hover:text-grass-600"
           >
             Next story
             <ArrowRight className="h-4 w-4" />

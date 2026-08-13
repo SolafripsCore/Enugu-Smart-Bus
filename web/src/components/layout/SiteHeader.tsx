@@ -73,7 +73,7 @@ export function SiteHeader() {
             : "border-transparent bg-white",
         ].join(" ")}
       >
-        <div className="container flex h-[72px] items-center justify-between gap-6">
+        <div className="container flex h-[80px] items-center justify-between gap-6 sm:h-[96px]">
           <Link
             href="/"
             className="flex items-center gap-3"
@@ -85,7 +85,7 @@ export function SiteHeader() {
               width={512}
               height={476}
               priority
-              className="h-12 w-auto sm:hidden"
+              className="h-14 w-auto sm:hidden"
             />
             <Image
               src="/images/brand/logo-full.webp"
@@ -93,7 +93,7 @@ export function SiteHeader() {
               width={960}
               height={406}
               priority
-              className="hidden h-14 w-auto sm:block"
+              className="hidden h-20 w-auto sm:block"
             />
           </Link>
 

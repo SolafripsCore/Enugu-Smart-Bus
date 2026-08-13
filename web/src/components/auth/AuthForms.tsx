@@ -204,7 +204,7 @@ function VerifyStep({
   otp: OtpResponse;
   code: string;
   setCode: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit: (code?: string) => void;
   onResend: () => void;
   onEdit: () => void;
   pending: boolean;
@@ -439,12 +439,12 @@ export function SignupForm() {
     }
   };
 
-  const verify = async () => {
-    if (!otp || code.length < OTP_LENGTH || pending) return;
+  const verify = async (enteredCode = code) => {
+    if (!otp || enteredCode.length < OTP_LENGTH || pending) return;
     setPending(true);
     setFormError(undefined);
     try {
-      const verified = await verifyOtp(otp.phone, code, "signup");
+      const verified = await verifyOtp(otp.phone, enteredCode, "signup");
       setVerificationToken(verified.verification_token);
       setStep(2);
     } catch (error) {
@@ -572,18 +572,18 @@ export function LoginForm() {
   const [formError, setFormError] = useState<string>();
   const [pending, setPending] = useState(false);
 
-  const submit = async () => {
+  const submit = async (enteredPin = pin) => {
     const next: Record<string, string> = {};
     if (phone.replace(/\D/g, "").length < 10)
       next.phone = "Enter your phone number, e.g. 803 000 0000.";
-    if (pin.length < PIN_LENGTH) next.pin = "Enter your 4-digit PIN.";
+    if (enteredPin.length < PIN_LENGTH) next.pin = "Enter your 4-digit PIN.";
     setErrors(next);
     setFormError(undefined);
     if (Object.keys(next).length > 0) return;
 
     setPending(true);
     try {
-      await login(withCountryCode(phone), pin);
+      await login(withCountryCode(phone), enteredPin);
       router.push("/account");
     } catch (error) {
       setPin("");
@@ -605,7 +605,7 @@ export function LoginForm() {
         className="mt-8 space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit();
         }}
       >
         <PhoneField
@@ -693,12 +693,12 @@ export function ForgotPinForm() {
     }
   };
 
-  const verify = async () => {
-    if (!otp || code.length < OTP_LENGTH || pending) return;
+  const verify = async (enteredCode = code) => {
+    if (!otp || enteredCode.length < OTP_LENGTH || pending) return;
     setPending(true);
     setFormError(undefined);
     try {
-      const verified = await verifyOtp(otp.phone, code, "reset_pin");
+      const verified = await verifyOtp(otp.phone, enteredCode, "reset_pin");
       setVerificationToken(verified.verification_token);
       setStep(2);
     } catch (error) {

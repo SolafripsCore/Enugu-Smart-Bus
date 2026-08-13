@@ -93,7 +93,7 @@ export function SiteHeader() {
               width={960}
               height={406}
               priority
-              className="hidden h-12 w-auto sm:block"
+              className="hidden h-14 w-auto sm:block"
             />
           </Link>
 

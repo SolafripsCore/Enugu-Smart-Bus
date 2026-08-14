@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -99,15 +100,22 @@ export function AccountDashboard() {
             {user.email ? ` · ${user.email}` : ""}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            logout();
-            router.push("/");
-          }}
-        >
-          Log out
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {user.is_admin ? (
+            <Link href="/admin">
+              <Button variant="secondary">Admin dashboard</Button>
+            </Link>
+          ) : null}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              logout();
+              router.push("/");
+            }}
+          >
+            Log out
+          </Button>
+        </div>
       </div>
 
       {demo ? (

@@ -22,6 +22,7 @@ class User(SQLModel, table=True):
         default=Decimal("0"), max_digits=12, decimal_places=2
     )
     is_active: bool = True
+    is_admin: bool = False
     created_at: datetime = Field(default_factory=utcnow)
 
 

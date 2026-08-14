@@ -12,6 +12,7 @@ export type User = {
   email: string | null;
   phone_verified_at: string | null;
   wallet_balance: string;
+  is_admin: boolean;
   created_at: string;
 };
 
@@ -58,6 +59,60 @@ export type Trip = {
   destination: string;
   fare: string;
   travelled_at: string;
+};
+
+export type AdminOverview = {
+  riders: number;
+  verified_riders: number;
+  active_riders: number;
+  new_riders_7d: number;
+  wallet_balance_total: string;
+  top_up_total: string;
+  transactions: number;
+  trips: number;
+  fare_total: string;
+  contact_messages: number;
+  newsletter_subscribers: number;
+};
+
+export type AdminRider = {
+  id: number;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  phone_verified_at: string | null;
+  wallet_balance: string;
+  is_active: boolean;
+  is_admin: boolean;
+  created_at: string;
+};
+
+export type AdminTransaction = Transaction & {
+  user_id: number;
+  user_name: string;
+  user_phone: string;
+};
+
+export type AdminTrip = Trip & {
+  user_id: number;
+  user_name: string;
+  user_phone: string;
+};
+
+export type AdminContactMessage = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string;
+  message: string;
+  created_at: string;
+};
+
+export type AdminSubscriber = {
+  id: number;
+  email: string;
+  created_at: string;
 };
 
 export class ApiError extends Error {

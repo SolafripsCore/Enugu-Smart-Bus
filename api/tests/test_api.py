@@ -1,24 +1,31 @@
 from collections.abc import Generator
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy.engine import Engine
+from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
 from app.database import get_session
 from app.main import app
+from app.models import User
 from app.phone import InvalidPhoneNumber, normalize_phone
 
 
-@pytest.fixture(name="client")
-def client_fixture() -> Generator[TestClient, None, None]:
+@pytest.fixture(name="engine")
+def engine_fixture() -> Engine:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
+    return engine
 
+
+@pytest.fixture(name="client")
+def client_fixture(engine: Engine) -> Generator[TestClient, None, None]:
     def session_override() -> Generator[Session, None, None]:
         with Session(engine) as session:
             yield session
@@ -218,3 +225,132 @@ def test_contact_and_newsletter(client: TestClient) -> None:
 
     again = client.post("/newsletter", json={"email": "CHIDI@example.com"})
     assert again.status_code == 200
+
+
+def make_admin(engine: Engine, phone: str = E164) -> None:
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.phone == phone)).one()
+        user.is_admin = True
+        session.add(user)
+        session.commit()
+
+
+def test_admin_endpoints_require_authorisation(
+    client: TestClient, engine: Engine
+) -> None:
+    assert client.get("/admin/overview").status_code == 401
+
+    rider_token = register(client)
+    rider_headers = {"Authorization": f"Bearer {rider_token}"}
+    assert client.get("/admin/overview", headers=rider_headers).status_code == 403
+    assert client.get("/admin/riders", headers=rider_headers).status_code == 403
+
+    me = client.get("/auth/me", headers=rider_headers)
+    assert me.json()["is_admin"] is False
+
+    make_admin(engine)
+    assert client.get("/admin/overview", headers=rider_headers).status_code == 200
+    assert client.get("/auth/me", headers=rider_headers).json()["is_admin"] is True
+
+
+def test_admin_dashboard_data(client: TestClient, engine: Engine) -> None:
+    token = register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    client.post("/account/wallet/top-up", json={"amount": "1500.00"}, headers=headers)
+    client.post(
+        "/contact",
+        json={
+            "name": "Chidi Nwosu",
+            "email": "chidi@example.com",
+            "subject": "Route enquiry",
+            "message": "Please add a stop at Independence Layout.",
+        },
+    )
+    client.post("/newsletter", json={"email": "chidi@example.com"})
+    make_admin(engine)
+
+    overview = client.get("/admin/overview", headers=headers).json()
+    assert overview["riders"] == 1
+    assert overview["verified_riders"] == 1
+    assert overview["contact_messages"] == 1
+    assert overview["newsletter_subscribers"] == 1
+    assert Decimal(overview["wallet_balance_total"]) > Decimal("0")
+
+    riders = client.get("/admin/riders", headers=headers).json()
+    assert riders[0]["phone"] == E164
+    assert client.get(f"/admin/riders?search={E164}", headers=headers).json()
+    assert client.get("/admin/riders?search=nobody", headers=headers).json() == []
+
+    rider_id = riders[0]["id"]
+    detail = client.get(f"/admin/riders/{rider_id}", headers=headers).json()
+    assert detail["transactions"] and detail["trips"]
+    assert client.get("/admin/riders/9999", headers=headers).status_code == 404
+
+    transactions = client.get("/admin/transactions", headers=headers).json()
+    assert transactions[0]["user_phone"] == E164
+    trips = client.get("/admin/trips", headers=headers).json()
+    assert trips[0]["user_name"]
+    assert client.get("/admin/messages", headers=headers).json()[0]["subject"]
+    assert client.get("/admin/newsletter", headers=headers).json()[0]["email"]
+
+
+def test_admin_can_adjust_wallet_and_block_rider(
+    client: TestClient, engine: Engine
+) -> None:
+    token = register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    make_admin(engine)
+    rider_id = client.get("/admin/riders", headers=headers).json()[0]["id"]
+
+    credited = client.post(
+        f"/admin/riders/{rider_id}/wallet",
+        json={"amount": "2500.00", "description": "Goodwill credit"},
+        headers=headers,
+    )
+    assert credited.status_code == 200
+    balance = Decimal(credited.json()["wallet_balance"])
+
+    debited = client.post(
+        f"/admin/riders/{rider_id}/wallet",
+        json={"amount": "-500.00", "description": "Correction"},
+        headers=headers,
+    )
+    assert Decimal(debited.json()["wallet_balance"]) == balance - Decimal("500.00")
+
+    overdraft = client.post(
+        f"/admin/riders/{rider_id}/wallet",
+        json={"amount": "-9999999.00", "description": "Too much"},
+        headers=headers,
+    )
+    assert overdraft.status_code == 422
+
+    demote_self = client.patch(
+        f"/admin/riders/{rider_id}",
+        json={"is_admin": False},
+        headers=headers,
+    )
+    assert demote_self.status_code == 400
+
+
+def test_admin_can_update_another_rider(client: TestClient, engine: Engine) -> None:
+    admin_token = register(client)
+    make_admin(engine)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    other_phone = "0803 000 0001"
+    other_token = verify_code(client, request_code(client, other_phone), other_phone)
+    client.post(
+        "/auth/pin",
+        json={"verification_token": other_token, "pin": PIN, "full_name": "Ngozi Eze"},
+    )
+    riders = client.get("/admin/riders?search=Ngozi", headers=headers).json()
+    rider_id = riders[0]["id"]
+
+    updated = client.patch(
+        f"/admin/riders/{rider_id}",
+        json={"is_active": False, "is_admin": True},
+        headers=headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["is_active"] is False
+    assert updated.json()["is_admin"] is True

@@ -74,6 +74,7 @@ class UserResponse(BaseModel):
     email: EmailStr | None = None
     phone_verified_at: datetime | None = None
     wallet_balance: Decimal
+    is_admin: bool = False
     created_at: datetime
 
 
@@ -123,3 +124,72 @@ class TripResponse(BaseModel):
 class WalletResponse(BaseModel):
     balance: Decimal
     transactions: list[TransactionResponse]
+
+
+class AdminOverview(BaseModel):
+    riders: int
+    verified_riders: int
+    active_riders: int
+    new_riders_7d: int
+    wallet_balance_total: Decimal
+    top_up_total: Decimal
+    transactions: int
+    trips: int
+    fare_total: Decimal
+    contact_messages: int
+    newsletter_subscribers: int
+
+
+class AdminRider(BaseModel):
+    id: int
+    full_name: str
+    phone: str
+    email: EmailStr | None = None
+    phone_verified_at: datetime | None = None
+    wallet_balance: Decimal
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+
+
+class AdminRiderDetail(AdminRider):
+    transactions: list[TransactionResponse]
+    trips: list[TripResponse]
+
+
+class AdminRiderUpdate(BaseModel):
+    is_active: bool | None = None
+    is_admin: bool | None = None
+
+
+class AdminWalletAdjustment(BaseModel):
+    amount: Decimal = Field(gt=Decimal("-500000"), le=Decimal("500000"))
+    description: str = Field(min_length=2, max_length=120)
+
+
+class AdminTransaction(TransactionResponse):
+    user_id: int
+    user_name: str
+    user_phone: str
+
+
+class AdminTrip(TripResponse):
+    user_id: int
+    user_name: str
+    user_phone: str
+
+
+class AdminContactMessage(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    phone: str | None = None
+    subject: str
+    message: str
+    created_at: datetime
+
+
+class AdminSubscriber(BaseModel):
+    id: int
+    email: EmailStr
+    created_at: datetime

@@ -12,10 +12,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 60 * 24 * 7
     cors_origins: str = "*"
-    site_url: str = "https://enugu-smart-bus-psi.vercel.app"
+    site_url: str = "https://enugusmartbus.com"
     resend_api_key: str = ""
     mail_from: str = "Enugu Smart Bus <onboarding@resend.dev>"
     contact_email: str = "support@enugusmartbus.com"
+    # Comma separated phone numbers granted administrator access on sign-in.
+    admin_phones: str = ""
 
     # Phone verification
     default_country_code: str = "234"

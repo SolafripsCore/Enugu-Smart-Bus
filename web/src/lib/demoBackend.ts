@@ -266,6 +266,7 @@ export function handleDemoRequest(
       phone_verified_at: new Date().toISOString(),
       pin,
       wallet_balance: "0.00",
+      is_admin: false,
       created_at: new Date().toISOString(),
       transactions: [],
       trips: [],

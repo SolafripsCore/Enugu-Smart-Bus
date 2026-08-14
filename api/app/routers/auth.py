@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import col, desc, select
 
+from app.admins import sync_admin_flag
 from app.config import get_settings
 from app.deps import CurrentUser, SessionDep
 from app.models import PhoneVerification, User, VerificationPurpose
@@ -220,7 +221,7 @@ def set_pin(payload: SetPinRequest, session: SessionDep) -> AuthResponse:
 
         seed_demo_activity(session, user)
         session.refresh(user)
-        return _auth_response(user)
+        return _auth_response(sync_admin_flag(session, user))
 
     if user is None:
         raise HTTPException(
@@ -235,7 +236,7 @@ def set_pin(payload: SetPinRequest, session: SessionDep) -> AuthResponse:
     session.add(user)
     session.commit()
     session.refresh(user)
-    return _auth_response(user)
+    return _auth_response(sync_admin_flag(session, user))
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -281,7 +282,7 @@ def login(payload: LoginRequest, session: SessionDep) -> AuthResponse:
     session.add(user)
     session.commit()
     session.refresh(user)
-    return _auth_response(user)
+    return _auth_response(sync_admin_flag(session, user))
 
 
 @router.get("/me", response_model=UserResponse)

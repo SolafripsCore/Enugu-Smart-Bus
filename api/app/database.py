@@ -3,6 +3,7 @@ from collections.abc import Generator
 from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.admins import promote_configured_admins
 from app.config import get_settings
 
 settings = get_settings()
@@ -28,6 +29,7 @@ USER_COLUMNS = {
     "phone_verified_at": "TIMESTAMP",
     "failed_pin_attempts": "INTEGER DEFAULT 0",
     "locked_until": "TIMESTAMP",
+    "is_admin": "BOOLEAN DEFAULT FALSE",
 }
 RELAXED_USER_COLUMNS = ("email", "hashed_password")
 
@@ -67,6 +69,8 @@ def upgrade_user_table() -> None:
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     upgrade_user_table()
+    with Session(engine) as session:
+        promote_configured_admins(session)
 
 
 def get_session() -> Generator[Session, None, None]:

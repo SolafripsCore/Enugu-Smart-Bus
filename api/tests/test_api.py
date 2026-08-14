@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -11,6 +12,7 @@ from app.database import get_session
 from app.main import app
 from app.models import User
 from app.phone import InvalidPhoneNumber, normalize_phone
+from app.schemas import AdminRider, AdminTrip
 
 
 @pytest.fixture(name="engine")
@@ -354,3 +356,31 @@ def test_admin_can_update_another_rider(client: TestClient, engine: Engine) -> N
     assert updated.status_code == 200
     assert updated.json()["is_active"] is False
     assert updated.json()["is_admin"] is True
+
+
+def test_admin_schemas_tolerate_legacy_accounts_without_phone() -> None:
+    """Accounts created before phone sign-up have no phone number."""
+    rider = AdminRider(
+        id=1,
+        full_name="Legacy Rider",
+        phone=None,
+        email="legacy@example.com",
+        wallet_balance=Decimal("0.00"),
+        is_active=True,
+        is_admin=False,
+        created_at=datetime.now(timezone.utc),
+    )
+    assert rider.phone is None
+
+    trip = AdminTrip(
+        id=1,
+        route="Route 2",
+        origin="Ogui",
+        destination="Abakpa",
+        fare=Decimal("300.00"),
+        travelled_at=datetime.now(timezone.utc),
+        user_id=1,
+        user_name="Legacy Rider",
+        user_phone=None,
+    )
+    assert trip.user_phone is None

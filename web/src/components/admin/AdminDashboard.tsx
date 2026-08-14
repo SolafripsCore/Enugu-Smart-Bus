@@ -278,7 +278,9 @@ export function AdminDashboard() {
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3">{rider.phone}</td>
+                  <td className="px-4 py-3">
+                    {rider.phone ?? rider.email ?? "—"}
+                  </td>
                   <td className="px-4 py-3">
                     {formatNaira(rider.wallet_balance)}
                   </td>
@@ -337,7 +339,7 @@ export function AdminDashboard() {
                   <td className="px-4 py-3">
                     {item.user_name}
                     <span className="block text-xs text-navy-900/50">
-                      {item.user_phone}
+                      {item.user_phone ?? "—"}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -371,7 +373,7 @@ export function AdminDashboard() {
                   <td className="px-4 py-3">
                     {trip.user_name}
                     <span className="block text-xs text-navy-900/50">
-                      {trip.user_phone}
+                      {trip.user_phone ?? "—"}
                     </span>
                   </td>
                   <td className="px-4 py-3">{trip.route}</td>

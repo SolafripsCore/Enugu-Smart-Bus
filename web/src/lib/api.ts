@@ -78,7 +78,7 @@ export type AdminOverview = {
 export type AdminRider = {
   id: number;
   full_name: string;
-  phone: string;
+  phone: string | null;
   email: string | null;
   phone_verified_at: string | null;
   wallet_balance: string;
@@ -90,13 +90,13 @@ export type AdminRider = {
 export type AdminTransaction = Transaction & {
   user_id: number;
   user_name: string;
-  user_phone: string;
+  user_phone: string | null;
 };
 
 export type AdminTrip = Trip & {
   user_id: number;
   user_name: string;
-  user_phone: string;
+  user_phone: string | null;
 };
 
 export type AdminContactMessage = {

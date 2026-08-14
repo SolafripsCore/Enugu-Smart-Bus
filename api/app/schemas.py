@@ -143,8 +143,9 @@ class AdminOverview(BaseModel):
 class AdminRider(BaseModel):
     id: int
     full_name: str
-    phone: str
-    email: EmailStr | None = None
+    # Accounts created before phone sign-up have no phone number.
+    phone: str | None = None
+    email: str | None = None
     phone_verified_at: datetime | None = None
     wallet_balance: Decimal
     is_active: bool
@@ -170,19 +171,19 @@ class AdminWalletAdjustment(BaseModel):
 class AdminTransaction(TransactionResponse):
     user_id: int
     user_name: str
-    user_phone: str
+    user_phone: str | None = None
 
 
 class AdminTrip(TripResponse):
     user_id: int
     user_name: str
-    user_phone: str
+    user_phone: str | None = None
 
 
 class AdminContactMessage(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: str
     phone: str | None = None
     subject: str
     message: str
@@ -191,5 +192,5 @@ class AdminContactMessage(BaseModel):
 
 class AdminSubscriber(BaseModel):
     id: int
-    email: EmailStr
+    email: str
     created_at: datetime

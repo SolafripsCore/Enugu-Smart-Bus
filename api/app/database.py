@@ -1,10 +1,12 @@
 from collections.abc import Generator
 
 from sqlalchemy import inspect, text
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, col, create_engine, select
 
 from app.admins import promote_configured_admins
 from app.config import get_settings
+from app.models import User
+from app.phone import normalize_phone
 
 settings = get_settings()
 
@@ -66,10 +68,32 @@ def upgrade_user_table() -> None:
             connection.execute(text(statement))
 
 
+def repair_phone_numbers(session: Session) -> None:
+    """Re-normalise accounts saved with the trunk prefix kept after the country code."""
+    users = session.exec(select(User).where(col(User.phone).is_not(None))).all()
+    taken = {user.phone for user in users}
+    changed = False
+    for user in users:
+        try:
+            normalized = normalize_phone(user.phone)
+        except ValueError:
+            continue
+        if normalized == user.phone or normalized in taken:
+            continue
+        taken.discard(user.phone)
+        taken.add(normalized)
+        user.phone = normalized
+        session.add(user)
+        changed = True
+    if changed:
+        session.commit()
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     upgrade_user_table()
     with Session(engine) as session:
+        repair_phone_numbers(session)
         promote_configured_admins(session)
 
 

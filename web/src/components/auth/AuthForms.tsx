@@ -399,7 +399,8 @@ function verifyOtp(phone: string, code: string, purpose: OtpPurpose) {
 
 function withCountryCode(local: string) {
   const digits = local.replace(/\D/g, "");
-  return digits.startsWith("234") ? `+${digits}` : `${COUNTRY_CODE}${digits}`;
+  const national = digits.startsWith("234") ? digits.slice(3) : digits;
+  return `${COUNTRY_CODE}${national.replace(/^0/, "")}`;
 }
 
 export function SignupForm() {

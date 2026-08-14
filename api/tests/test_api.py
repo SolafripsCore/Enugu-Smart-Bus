@@ -8,7 +8,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from app.database import get_session
+from app.database import get_session, repair_phone_numbers
 from app.main import app
 from app.models import User
 from app.phone import InvalidPhoneNumber, normalize_phone
@@ -76,7 +76,14 @@ def register(client: TestClient, full_name: str = "Ada Okonkwo") -> str:
 
 
 def test_normalize_phone() -> None:
-    for raw in ("08030000000", "8030000000", "2348030000000", "+234 803 000 0000"):
+    for raw in (
+        "08030000000",
+        "8030000000",
+        "2348030000000",
+        "+234 803 000 0000",
+        "+2340803 000 0000",
+        "+23408030000000",
+    ):
         assert normalize_phone(raw) == E164
     for raw in ("", "0123", "0603000000000"):
         with pytest.raises(InvalidPhoneNumber):
@@ -356,6 +363,32 @@ def test_admin_can_update_another_rider(client: TestClient, engine: Engine) -> N
     assert updated.status_code == 200
     assert updated.json()["is_active"] is False
     assert updated.json()["is_admin"] is True
+
+
+def test_repair_phone_numbers_strips_trunk_prefix(engine: Engine) -> None:
+    with Session(engine) as session:
+        session.add(
+            User(full_name="Trunk Prefix", phone="+23408030000000", hashed_pin="x")
+        )
+        session.add(User(full_name="Correct", phone="+2348031111111", hashed_pin="x"))
+        session.commit()
+
+        repair_phone_numbers(session)
+
+        phones = {user.phone for user in session.exec(select(User)).all()}
+        assert phones == {E164, "+2348031111111"}
+
+
+def test_repair_phone_numbers_keeps_conflicting_duplicate(engine: Engine) -> None:
+    with Session(engine) as session:
+        session.add(User(full_name="Trunk", phone="+23408030000000", hashed_pin="x"))
+        session.add(User(full_name="Canonical", phone=E164, hashed_pin="x"))
+        session.commit()
+
+        repair_phone_numbers(session)
+
+        phones = sorted(user.phone for user in session.exec(select(User)).all())
+        assert phones == ["+23408030000000", E164]
 
 
 def test_admin_schemas_tolerate_legacy_accounts_without_phone() -> None:

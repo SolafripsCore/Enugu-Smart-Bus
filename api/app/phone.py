@@ -27,13 +27,13 @@ def normalize_phone(raw: str) -> str:
     if not digits:
         raise InvalidPhoneNumber("Enter your phone number.")
 
-    if international:
+    if digits.startswith(country):
+        # Drop the national trunk prefix people keep when typing +234 0803...
+        subscriber = digits[len(country) :].removeprefix("0")
+    elif international:
         if len(digits) < 8 or len(digits) > 15:
             raise InvalidPhoneNumber("Enter a valid phone number.")
         return f"+{digits}"
-
-    if digits.startswith(country):
-        subscriber = digits[len(country) :]
     elif digits.startswith("0"):
         subscriber = digits[1:]
     else:

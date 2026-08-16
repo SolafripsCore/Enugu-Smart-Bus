@@ -16,6 +16,7 @@ export const site = {
     partnerships: "partnerships@enugusmartbus.com",
     media: "media@enugusmartbus.com",
   },
+  webmailUrl: "https://d19864.lon1.stableserver.net:2096/",
   hours: "Monday – Sunday, 9:00 AM – 8:00 PM (WAT)",
 } as const;
 

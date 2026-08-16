@@ -61,6 +61,14 @@ export function SiteHeader() {
             >
               {site.emails.support}
             </a>
+            <a
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3 py-1 font-medium transition hover:border-white/60 hover:text-white"
+              href={site.webmailUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Webmail
+            </a>
           </div>
         </div>
       </div>

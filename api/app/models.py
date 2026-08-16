@@ -72,6 +72,27 @@ class Transaction(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class PaymentStatus(str, Enum):
+    pending = "pending"
+    success = "success"
+    failed = "failed"
+    abandoned = "abandoned"
+
+
+class Payment(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    reference: str = Field(index=True, unique=True)
+    amount: Decimal = Field(max_digits=12, decimal_places=2)
+    status: PaymentStatus = Field(default=PaymentStatus.pending, index=True)
+    provider: str = "paystack"
+    channel: str | None = None
+    provider_reference: str | None = None
+    transaction_id: int | None = Field(default=None, foreign_key="transaction.id")
+    created_at: datetime = Field(default_factory=utcnow)
+    completed_at: datetime | None = None
+
+
 class Trip(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)

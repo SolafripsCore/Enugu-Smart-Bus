@@ -4,7 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config import get_settings
-from app.models import TransactionKind, VerificationPurpose
+from app.models import PaymentStatus, TransactionKind, VerificationPurpose
 
 settings = get_settings()
 
@@ -124,6 +124,34 @@ class TripResponse(BaseModel):
 class WalletResponse(BaseModel):
     balance: Decimal
     transactions: list[TransactionResponse]
+
+
+class PaymentInitRequest(BaseModel):
+    amount: Decimal = Field(gt=0, le=Decimal("500000"))
+    email: EmailStr | None = None
+
+
+class PaymentInitResponse(BaseModel):
+    reference: str
+    authorization_url: str
+    amount: Decimal
+    live_mode: bool
+
+
+class PaymentStatusResponse(BaseModel):
+    reference: str
+    status: PaymentStatus
+    amount: Decimal
+    credited: bool
+    balance: Decimal
+    message: str
+
+
+class PaymentsConfigResponse(BaseModel):
+    enabled: bool
+    live_mode: bool
+    min_amount: int
+    max_amount: int
 
 
 class AdminOverview(BaseModel):

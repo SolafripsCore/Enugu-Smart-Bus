@@ -36,10 +36,22 @@ GET  /auth/me                Current user (Bearer token)
 POST /auth/forgot-password   Issue a password reset token
 POST /auth/reset-password    Consume a reset token and set a new password
 GET  /account/wallet         Wallet balance + recent transactions
-POST /account/wallet/top-up  Add funds to the wallet
 GET  /account/trips          Recent trips
+GET  /payments/config        Whether card top-ups are live, and the limits
+POST /payments/initialize    Start a Paystack top-up (returns a checkout URL)
+GET  /payments/verify/{ref}  Confirm a top-up and credit the wallet
+POST /payments/webhook       Paystack webhook (signature checked)
 GET  /healthz                Health check
 ```
+
+## Payments
+
+Wallet top-ups go through Paystack. The wallet is credited only from a payload
+the API fetched itself (verify) or a webhook whose `x-paystack-signature`
+matched, and crediting is idempotent on the payment reference so the browser
+return and the webhook cannot both add the money. Set `PAYSTACK_SECRET_KEY`
+(`sk_test_…` or `sk_live_…`) and point the Paystack dashboard webhook at
+`<api-url>/payments/webhook`.
 
 New accounts are seeded with a welcome credit and a few sample trips so the
 dashboard is populated on first login.

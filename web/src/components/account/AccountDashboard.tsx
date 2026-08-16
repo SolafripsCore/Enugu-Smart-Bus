@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { ProfileSettings } from "@/components/account/ProfileSettings";
@@ -12,6 +12,9 @@ import {
   apiFetch,
   formatNaira,
   isDemoMode,
+  type PaymentInit,
+  type PaymentsConfig,
+  type PaymentStatus,
   type Trip,
   type Wallet,
 } from "@/lib/api";
@@ -30,6 +33,7 @@ function formatDateTime(value: string) {
 
 export function AccountDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, token, loading, logout } = useAuth();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -37,6 +41,8 @@ export function AccountDashboard() {
   const [pending, setPending] = useState(false);
   const [demo, setDemo] = useState(false);
   const [error, setError] = useState<string>();
+  const [payments, setPayments] = useState<PaymentsConfig | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string>();
 
   const load = useCallback(async (accessToken: string) => {
     const [walletData, tripData] = await Promise.all([
@@ -45,6 +51,12 @@ export function AccountDashboard() {
     ]);
     setWallet(walletData);
     setTrips(tripData);
+  }, []);
+
+  useEffect(() => {
+    apiFetch<PaymentsConfig>("/payments/config")
+      .then(setPayments)
+      .catch(() => setPayments(null));
   }, []);
 
   useEffect(() => {
@@ -58,21 +70,44 @@ export function AccountDashboard() {
       .finally(() => setDemo(isDemoMode()));
   }, [load, loading, router, token]);
 
+  // Paystack sends the rider back here with the reference it was given.
+  const reference = searchParams.get("reference") ?? searchParams.get("trxref");
+
+  useEffect(() => {
+    if (!token || !reference) return;
+    let cancelled = false;
+    apiFetch<PaymentStatus>(`/payments/verify/${reference}`, { token })
+      .then((result) => {
+        if (cancelled) return;
+        setPaymentNotice(result.message);
+        return load(token);
+      })
+      .catch(() => {
+        if (!cancelled) setError("We couldn't confirm that payment.");
+      })
+      .finally(() => {
+        if (!cancelled) router.replace("/account");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [load, reference, router, token]);
+
   const onTopUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) return;
     setPending(true);
     setError(undefined);
+    setPaymentNotice(undefined);
     try {
-      const updated = await apiFetch<Wallet>("/account/wallet/top-up", {
+      const checkout = await apiFetch<PaymentInit>("/payments/initialize", {
         method: "POST",
-        body: { amount, description: "Wallet top-up" },
+        body: { amount },
         token,
       });
-      setWallet(updated);
+      window.location.href = checkout.authorization_url;
     } catch {
-      setError("Top-up failed. Please try again.");
-    } finally {
+      setError("We couldn't start that payment. Please try again.");
       setPending(false);
     }
   };
@@ -122,6 +157,12 @@ export function AccountDashboard() {
         <p className="mt-6 rounded-xl bg-navy-50 px-4 py-3 text-sm text-navy-700">
           Preview mode: no API host is attached, so your account lives in this
           browser only.
+        </p>
+      ) : null}
+
+      {paymentNotice ? (
+        <p className="mt-6 rounded-xl bg-grass-50 px-4 py-3 text-sm text-grass-700">
+          {paymentNotice}
         </p>
       ) : null}
 
@@ -176,10 +217,20 @@ export function AccountDashboard() {
                 onChange={(event) => setAmount(event.target.value)}
                 className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-white/40 focus:border-grass-400"
               />
-              <Button type="submit" disabled={pending}>
-                {pending ? "Adding…" : "Add funds"}
+              <Button
+                type="submit"
+                disabled={pending || payments?.enabled === false}
+              >
+                {pending ? "Redirecting…" : "Add funds"}
               </Button>
             </div>
+            <p className="mt-3 text-xs text-white/50">
+              {payments?.enabled === false
+                ? "Card and transfer top-ups are being activated — check back shortly."
+                : `Secured by Paystack — card, bank transfer or USSD.${
+                    payments && !payments.live_mode ? " (test mode)" : ""
+                  }`}
+            </p>
           </form>
         </div>
 

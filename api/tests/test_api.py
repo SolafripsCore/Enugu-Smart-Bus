@@ -8,9 +8,10 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
+from app import paystack
 from app.database import get_session, repair_phone_numbers
 from app.main import app
-from app.models import User
+from app.models import Payment, PaymentStatus, Transaction, TransactionKind, User
 from app.phone import InvalidPhoneNumber, normalize_phone
 from app.schemas import AdminRider, AdminTrip
 
@@ -75,6 +76,22 @@ def register(client: TestClient, full_name: str = "Ada Okonkwo") -> str:
     return created.json()["token"]["access_token"]
 
 
+def credit_wallet(engine: Engine, amount: Decimal) -> None:
+    with Session(engine) as session:
+        user = session.exec(select(User)).one()
+        user.wallet_balance += amount
+        session.add(user)
+        session.add(
+            Transaction(
+                user_id=user.id,
+                kind=TransactionKind.top_up,
+                amount=amount,
+                description="Wallet top-up",
+            )
+        )
+        session.commit()
+
+
 def test_normalize_phone() -> None:
     for raw in (
         "08030000000",
@@ -110,11 +127,6 @@ def test_signup_login_and_wallet(client: TestClient) -> None:
     wallet = client.get("/account/wallet", headers=headers)
     assert float(wallet.json()["balance"]) == pytest.approx(1100.0)
     assert len(wallet.json()["transactions"]) == 4
-
-    topped_up = client.post(
-        "/account/wallet/top-up", json={"amount": "900.00"}, headers=headers
-    )
-    assert float(topped_up.json()["balance"]) == pytest.approx(2000.0)
 
     assert len(client.get("/account/trips", headers=headers).json()) == 3
 
@@ -265,7 +277,7 @@ def test_admin_endpoints_require_authorisation(
 def test_admin_dashboard_data(client: TestClient, engine: Engine) -> None:
     token = register(client)
     headers = {"Authorization": f"Bearer {token}"}
-    client.post("/account/wallet/top-up", json={"amount": "1500.00"}, headers=headers)
+    credit_wallet(engine, Decimal("1500.00"))
     client.post(
         "/contact",
         json={
@@ -417,3 +429,130 @@ def test_admin_schemas_tolerate_legacy_accounts_without_phone() -> None:
         user_phone=None,
     )
     assert trip.user_phone is None
+
+
+@pytest.fixture(name="paystack_stub")
+def paystack_stub_fixture(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    state: dict[str, object] = {"status": "success", "calls": 0}
+
+    def fake_initialize(**kwargs: object) -> dict[str, object]:
+        state["reference"] = kwargs["reference"]
+        state["amount"] = kwargs["amount"]
+        return {"authorization_url": "https://checkout.paystack.com/abc123"}
+
+    def fake_verify(reference: str) -> dict[str, object]:
+        state["calls"] = int(state["calls"]) + 1
+        return {
+            "status": state["status"],
+            "reference": reference,
+            "amount": paystack.to_kobo(Decimal(str(state.get("amount", "0")))),
+            "channel": "card",
+            "id": 424242,
+        }
+
+    monkeypatch.setattr(paystack, "paystack_enabled", lambda: True)
+    monkeypatch.setattr(paystack, "is_live_mode", lambda: False)
+    monkeypatch.setattr(paystack, "initialize_transaction", fake_initialize)
+    monkeypatch.setattr(paystack, "verify_transaction", fake_verify)
+    return state
+
+
+def test_wallet_cannot_be_credited_without_a_payment(client: TestClient) -> None:
+    headers = {"Authorization": f"Bearer {register(client)}"}
+    assert (
+        client.post(
+            "/account/wallet/top-up", json={"amount": "5000"}, headers=headers
+        ).status_code
+        == 404
+    )
+
+
+def test_payment_credits_wallet_once(
+    client: TestClient, engine: Engine, paystack_stub: dict[str, object]
+) -> None:
+    headers = {"Authorization": f"Bearer {register(client)}"}
+    before = Decimal(client.get("/account/wallet", headers=headers).json()["balance"])
+
+    started = client.post(
+        "/payments/initialize", json={"amount": "2000"}, headers=headers
+    )
+    assert started.status_code == 200, started.text
+    reference = started.json()["reference"]
+    assert started.json()["authorization_url"].startswith("https://checkout.paystack")
+
+    # Nothing is credited until Paystack confirms the charge.
+    with Session(engine) as session:
+        payment = session.exec(
+            select(Payment).where(Payment.reference == reference)
+        ).one()
+        assert payment.status == PaymentStatus.pending
+    assert (
+        Decimal(client.get("/account/wallet", headers=headers).json()["balance"])
+        == before
+    )
+
+    verified = client.get(f"/payments/verify/{reference}", headers=headers)
+    assert verified.status_code == 200, verified.text
+    assert verified.json()["credited"] is True
+    assert Decimal(verified.json()["balance"]) == before + Decimal("2000")
+
+    # Re-verifying (or a late webhook) must not credit the wallet twice.
+    again = client.get(f"/payments/verify/{reference}", headers=headers)
+    assert again.json()["credited"] is False
+    assert Decimal(again.json()["balance"]) == before + Decimal("2000")
+
+
+def test_failed_payment_does_not_credit(
+    client: TestClient, paystack_stub: dict[str, object]
+) -> None:
+    paystack_stub["status"] = "failed"
+    headers = {"Authorization": f"Bearer {register(client)}"}
+    before = Decimal(client.get("/account/wallet", headers=headers).json()["balance"])
+
+    reference = client.post(
+        "/payments/initialize", json={"amount": "2000"}, headers=headers
+    ).json()["reference"]
+    verified = client.get(f"/payments/verify/{reference}", headers=headers)
+
+    assert verified.json()["status"] == "failed"
+    assert verified.json()["credited"] is False
+    assert Decimal(verified.json()["balance"]) == before
+
+
+def test_payment_belongs_to_the_signed_in_rider(
+    client: TestClient, paystack_stub: dict[str, object]
+) -> None:
+    headers = {"Authorization": f"Bearer {register(client)}"}
+    reference = client.post(
+        "/payments/initialize", json={"amount": "2000"}, headers=headers
+    ).json()["reference"]
+
+    other = verify_code(client, request_code(client, "08031111111"), "08031111111")
+    other_token = client.post(
+        "/auth/pin",
+        json={"verification_token": other, "pin": PIN, "full_name": "Emeka Obi"},
+    ).json()["token"]["access_token"]
+
+    stolen = client.get(
+        f"/payments/verify/{reference}",
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert stolen.status_code == 404
+
+
+def test_webhook_requires_a_valid_signature(
+    client: TestClient, paystack_stub: dict[str, object]
+) -> None:
+    headers = {"Authorization": f"Bearer {register(client)}"}
+    reference = client.post(
+        "/payments/initialize", json={"amount": "2000"}, headers=headers
+    ).json()["reference"]
+
+    unsigned = client.post(
+        "/payments/webhook",
+        json={"event": "charge.success", "data": {"reference": reference}},
+    )
+    assert unsigned.status_code == 401
+    assert Decimal(
+        client.get("/account/wallet", headers=headers).json()["balance"]
+    ) == Decimal("1100.00")

@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     # still be completed end to end (development and pre-launch previews).
     expose_otp: bool = True
 
+    # Payments (Paystack)
+    paystack_secret_key: str = ""
+    paystack_public_key: str = ""
+    # Where Paystack returns the rider after checkout.
+    paystack_callback_path: str = "/account"
+    min_top_up: int = 100
+    max_top_up: int = 500_000
+
     # SMS providers (first configured one wins)
     termii_api_key: str = ""
     termii_sender_id: str = "ESBus"

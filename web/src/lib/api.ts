@@ -52,6 +52,29 @@ export type Wallet = {
   transactions: Transaction[];
 };
 
+export type PaymentsConfig = {
+  enabled: boolean;
+  live_mode: boolean;
+  min_amount: number;
+  max_amount: number;
+};
+
+export type PaymentInit = {
+  reference: string;
+  authorization_url: string;
+  amount: string;
+  live_mode: boolean;
+};
+
+export type PaymentStatus = {
+  reference: string;
+  status: "pending" | "success" | "failed" | "abandoned";
+  amount: string;
+  credited: boolean;
+  balance: string;
+  message: string;
+};
+
 export type Trip = {
   id: number;
   route: string;

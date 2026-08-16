@@ -314,19 +314,14 @@ export function handleDemoRequest(
     return wallet(requireUser(store, token));
   }
 
-  if (path === "/account/wallet/top-up" && method === "POST") {
-    const user = requireUser(store, token);
-    const amount = Number(body?.amount ?? 0);
-    user.wallet_balance = (Number(user.wallet_balance) + amount).toFixed(2);
-    user.transactions.push({
-      id: user.transactions.length + 1,
-      kind: "top_up",
-      amount: amount.toFixed(2),
-      description: String(body?.description ?? "Wallet top-up"),
-      created_at: new Date().toISOString(),
-    });
-    writeStore(store);
-    return wallet(user);
+  if (path === "/payments/config" && method === "GET") {
+    // Preview mode has no API host, so no real payment can be taken.
+    return {
+      enabled: false,
+      live_mode: false,
+      min_amount: 100,
+      max_amount: 500000,
+    };
   }
 
   if (path === "/account/trips" && method === "GET") {

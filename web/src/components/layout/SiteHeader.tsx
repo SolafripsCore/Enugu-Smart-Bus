@@ -278,6 +278,15 @@ export function SiteHeader() {
             <ButtonLink href="/download" variant="ghost" className="w-full">
               Download our app
             </ButtonLink>
+            <a
+              href={site.webmailUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center justify-center rounded-full border border-navy-100 px-4 py-3 text-sm font-medium text-navy-700"
+            >
+              Webmail
+            </a>
           </div>
         </div>
       </div>
